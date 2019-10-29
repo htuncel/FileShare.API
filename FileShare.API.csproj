@@ -19,7 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="wwwroot\App_Data\26de5558-043f-4eed-1c90-08d75a231a65\" />
+    <Folder Include="wwwroot\App_Data\" />
   </ItemGroup>
 
 </Project>

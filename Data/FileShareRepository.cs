@@ -42,7 +42,7 @@ namespace FileShare.API.Data
         }
         public async Task<IEnumerable<Folder>> GetFolders(Guid id)
         {
-            List<Folder> folders = await _context.Folders.Where(f => f.UserId == id).Include(f => f.Files).ToListAsync();
+            List<Folder> folders = await _context.Folders.Where(f => f.UserId == id && f.FolderName != id.ToString()).Include(f => f.Files).ToListAsync();
 
             return folders;
         }

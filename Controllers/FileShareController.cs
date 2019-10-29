@@ -18,7 +18,6 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace FileShare.API.Controllers
 {
-    [Authorize]
     [Route("api/[controller]")]
     [ApiController]
     public class FileShareController : ControllerBase
@@ -33,6 +32,7 @@ namespace FileShare.API.Controllers
             _hostingEnv = HostingEnv;
         }
 
+        [Authorize]
         [HttpGet("folder")]
         public async Task<IActionResult> GetFolders()
         {
@@ -43,6 +43,7 @@ namespace FileShare.API.Controllers
             return Ok(folders);
         }
 
+        [Authorize]
         [HttpDelete("folder/{id}")]
         public async Task<IActionResult> DeleteFolder(string id)
         {
@@ -78,6 +79,7 @@ namespace FileShare.API.Controllers
             }
         }
 
+        [Authorize]
         [HttpGet("folder/{id}")]
         public async Task<IActionResult> GetFolder(string id)
         {
@@ -100,6 +102,7 @@ namespace FileShare.API.Controllers
             }
         }
 
+        [Authorize]
         [HttpGet("access")]
         public async Task<IActionResult> GetOneTimeAccessLinks()
         {
@@ -115,7 +118,6 @@ namespace FileShare.API.Controllers
         {
             try
             {
-                Guid.TryParse(User.FindFirst(ClaimTypes.NameIdentifier).Value, out Guid userId);
                 Guid linkForRepoId = new Guid(id);
                 OneTimeAccessLink link = await _repo.GetOneTimeAccessLink(linkForRepoId);
                 Models.File fileFromRepo = await _repo.GetFile(link.FileId);
@@ -132,11 +134,11 @@ namespace FileShare.API.Controllers
                 string folderName;
                 if (folderFromRepo.FolderName == folderFromRepo.UserId.ToString())
                 {
-                    folderName = "App_Data/" + userId.ToString() + "/" + fileFromRepo.Id;
+                    folderName = "App_Data/" + folderFromRepo.UserId.ToString() + "/" + fileFromRepo.Id;
                 }
                 else
                 {
-                    folderName = "App_Data/" + userId.ToString() + "/" + folderFromRepo.Id + "/" + fileFromRepo.Id;
+                    folderName = "App_Data/" + folderFromRepo.UserId.ToString() + "/" + folderFromRepo.Id + "/" + fileFromRepo.Id;
                 }
                 string webRootPath = _hostingEnv.WebRootPath;
                 string newPath = Path.Combine(webRootPath, folderName);
@@ -148,7 +150,11 @@ namespace FileShare.API.Controllers
 
                     byte[] fileBytes = System.IO.File.ReadAllBytes(newPath);
 
-                    return File(fileBytes, "application/force-download", fileName);
+                    return new JsonResult(new
+                    {
+                        File = File(fileBytes, "application/force-download", fileName),
+                        Name = fileName
+                    });
                 }
                 return BadRequest("There was a problem accessing file information");
 
@@ -159,7 +165,39 @@ namespace FileShare.API.Controllers
             }
         }
 
+        [Authorize]
+        [HttpDelete("access/{id}")]
+        public async Task<IActionResult> DeleteOneTimeAccessLink(string id)
+        {
+            try
+            {
+                Guid.TryParse(User.FindFirst(ClaimTypes.NameIdentifier).Value, out Guid userId);
+                Guid linkForRepoId = new Guid(id);
 
+                OneTimeAccessLink link = await _repo.GetOneTimeAccessLink(linkForRepoId);
+
+                if(userId != link.UserId)
+                {
+                    return Unauthorized();
+                }
+
+                _repo.Delete(link);                
+
+                if (await _repo.SaveAll())
+                {
+                    return Ok();
+                }
+
+                return BadRequest("There was a problem deleting file access link");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(400, ex.Message);
+            }
+        }
+
+
+        [Authorize]
         [HttpPost("folder/{folderId}/file/{fileId}")]
         public async Task<IActionResult> CreateOneTimeAccessLink(string folderId, string fileId)
         {
@@ -179,6 +217,8 @@ namespace FileShare.API.Controllers
                 otal.Id = Guid.NewGuid();
                 otal.UserId = userId;
                 otal.IsUsed = false;
+                otal.FileName = file.FileName;
+                otal.FolderName = folder.FolderName;
                 otal.FileId = file.Id;
                 otal.UsedAt = null;
                 _repo.Add(otal);
@@ -195,35 +235,39 @@ namespace FileShare.API.Controllers
             }
         }
 
+        [Authorize]
         [HttpPut("folder/{id}")]
         public async Task<IActionResult> UpdateFolder(string id, FolderForCreationDto folderForCreationDto)
         {
-            try
             {
-                Guid.TryParse(User.FindFirst(ClaimTypes.NameIdentifier).Value, out Guid userId);
-                Guid folderForRepoId = new Guid(id);
+                try
+                {
+                    Guid.TryParse(User.FindFirst(ClaimTypes.NameIdentifier).Value, out Guid userId);
+                    Guid folderForRepoId = new Guid(id);
 
-                Folder folder = await _repo.GetFolder(folderForRepoId);
+                    Folder folder = await _repo.GetFolder(folderForRepoId);
 
-                if (userId != folder.UserId)
-                    return Unauthorized();
+                    if (userId != folder.UserId)
+                        return Unauthorized();
 
-                folder.FolderName = folderForCreationDto.Name;
-                folder.FolderDescription = folderForCreationDto.Description;
+                    folder.FolderName = folderForCreationDto.Name;
+                    folder.FolderDescription = folderForCreationDto.Description;
 
-                if (await _repo.SaveAll())
-                    return NoContent();
+                    if (await _repo.SaveAll())
+                        return NoContent();
 
-                return BadRequest("There was a problem updating folder information");
+                    return BadRequest("There was a problem updating folder information");
+
+                }
+                catch (Exception ex)
+                {
+                    return StatusCode(400, ex.Message);
+                }
 
             }
-            catch (Exception ex)
-            {
-                return StatusCode(400, ex.Message);
-            }
-
         }
 
+        [Authorize]
         [HttpPut("folder/{folderId}/file/{fileId}")]
         public async Task<IActionResult> UpdateFile(string folderId, string fileId, FileForUpdateDto fileForUpdateDto)
         {
@@ -254,6 +298,7 @@ namespace FileShare.API.Controllers
 
         }
 
+        [Authorize]
         [HttpPost("folder/{folderId}")]
         public async Task<IActionResult> UploadFile(IFormFile file, string folderId = "")
         {
@@ -329,6 +374,7 @@ namespace FileShare.API.Controllers
             }
         }
 
+        [Authorize]
         [HttpDelete("folder/{folderId}/file/{fileId}")]
         public async Task<IActionResult> DeleteFile(string folderId, string fileId)
         {
@@ -373,6 +419,7 @@ namespace FileShare.API.Controllers
             }
         }
 
+        [Authorize]
         [HttpPost("folder")]
         public async Task<IActionResult> CreateFolder(FolderForCreationDto folderForCreationDto)
         {
@@ -423,6 +470,7 @@ namespace FileShare.API.Controllers
 
 
 
+        [Authorize]
         [HttpGet("folder/{folderId}/file/{fileId}")]
         public async Task<IActionResult> GetFile(string folderId, string fileId)
         {
