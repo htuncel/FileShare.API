@@ -1,5 +1,5 @@
 # FileShare.API
-1- Clone the project
-2- Run dotnet restore command
-3- Run update-database command fromnuget package manager
-4- Start the project
+1- Clone the project <br />
+2- Run dotnet restore command <br />
+3- Run update-database command from nuget package manager <br />
+4- Start the project <br />
